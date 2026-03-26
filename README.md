@@ -1,6 +1,6 @@
 ## 🌙 Zakat Calculator – Hackathon Project Overview
 
-## Zakat Calculator is a practical and easy‑to‑use application built to help Muslims accurately calculate their annual Zakat — one of the five pillars of Islam. Designed with simplicity and precision in mind, this tool automates the complex parts of Zakat calculation so users can fulfill their religious obligation with confidence and ease.
+ Zakat Calculator is a practical and easy‑to‑use application built to help Muslims accurately calculate their annual Zakat — one of the five pillars of Islam. Designed with simplicity and precision in mind, this tool automates the complex parts of Zakat calculation so users can fulfill their religious obligation with confidence and ease.
 
 ## 🧠 Key Features
 ✅ Calculates Zakat on wealth including savings, gold, silver and business assets
