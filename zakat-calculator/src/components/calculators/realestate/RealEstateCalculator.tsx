@@ -1,0 +1,194 @@
+'use client'
+
+import React, { useState, useEffect, useCallback } from 'react'
+import { Tabs } from '@/components/ui/tabs'
+import { useZakatStore } from '@/store/zakatStore'
+import { RealEstateValues } from '@/store/modules/realEstate'
+import { CalculatorNav } from '@/components/ui/calculator-nav'
+
+import { RentalPropertyTab } from './tabs/RentalPropertyTab'
+import { PrimaryResidenceTab } from './tabs/PrimaryResidenceTab'
+import { PropertyForSaleTab } from './tabs/PropertyForSaleTab'
+import { VacantLandTab } from './tabs/VacantLandTab'
+import { CalculatorProps } from '@/types/calculator'
+import { useStoreHydration } from '@/hooks/useStoreHydration'
+import { useCalculatorReset } from '@/hooks/useCalculatorReset'
+
+type RealEstateErrors = Record<string, string | undefined>
+
+const PROPERTY_TYPE_INFO = {
+  rental: {
+    title: 'Rental Property',
+    description: 'Net rental income is zakatable after expenses',
+    tooltip: 'Calculate Zakat on net rental income (income minus expenses) if Hawl is met'
+  },
+  primary: {
+    title: 'Primary Residence',
+    description: 'Personal residence is exempt from Zakat',
+    tooltip: 'Primary residence for personal use is not subject to Zakat'
+  },
+  sale: {
+    title: 'Property for Sale',
+    description: 'Property intended for sale is zakatable',
+    tooltip: 'Full market value is zakatable if property is actively for sale and Hawl is met'
+  },
+  vacant: {
+    title: 'Vacant Land',
+    description: 'Zakatable if intended for sale',
+    tooltip: 'Land value is zakatable if intended for sale and Hawl requirement is met'
+  }
+} as const
+
+export function RealEstateCalculator({
+  currency,
+  onUpdateValues,
+  onHawlUpdate,
+  onCalculatorChange,
+  onOpenSummary,
+  initialValues = {},
+  initialHawlMet = true
+}: CalculatorProps) {
+  const [isLoading, setIsLoading] = useState(false)
+  const [isPropertyForSaleActive, setIsPropertyForSaleActive] = useState(false);
+  const [isVacantLandSold, setIsVacantLandSold] = useState(false);
+
+  const {
+    realEstateValues,
+    realEstateErrors,
+    realEstateHawlMet,
+    isValid,
+    setRealEstateValue,
+    setRealEstateHawlMet,
+    getRealEstateBreakdown,
+    validateRealEstateValues
+  } = useZakatStore()
+
+  const isHydrated = useStoreHydration()
+
+  // Post-hydration initialization
+  useEffect(() => {
+    if (!isHydrated) return
+    if (realEstateValues) {
+      if (typeof realEstateValues.property_for_sale_active === 'boolean') {
+        setIsPropertyForSaleActive(realEstateValues.property_for_sale_active);
+      }
+      if (typeof realEstateValues.vacant_land_sold === 'boolean') {
+        setIsVacantLandSold(realEstateValues.vacant_land_sold);
+      }
+      setRealEstateHawlMet(realEstateHawlMet);
+      onHawlUpdate(realEstateHawlMet);
+      if (onUpdateValues) {
+        const numericValues: Record<string, number> = {
+          primary_residence_value: realEstateValues.primary_residence_value || 0,
+          rental_income: realEstateValues.rental_income || 0,
+          rental_expenses: realEstateValues.rental_expenses || 0,
+          property_for_sale_value: realEstateValues.property_for_sale_value || 0,
+          vacant_land_value: realEstateValues.vacant_land_value || 0,
+          sale_price: realEstateValues.sale_price || 0
+        };
+        onUpdateValues(numericValues);
+      }
+    }
+  }, [isHydrated, realEstateValues, setRealEstateHawlMet, realEstateHawlMet, onHawlUpdate, onUpdateValues])
+
+  // Handle store resets
+  const handleStoreReset = useCallback(() => {
+    // RealEstateCalculator has no local state to clear beyond what the store handles
+  }, [])
+
+  useCalculatorReset(isHydrated, handleStoreReset)
+
+  const handleValueChange = (
+    fieldId: keyof RealEstateValues,
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    setIsLoading(true)
+    try {
+      const value = event.target.value === '' ? 0 : parseFloat(event.target.value)
+      if (!isNaN(value)) {
+        setRealEstateValue(fieldId, value)
+        validateRealEstateValues()
+      }
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleToggleChange = (
+    fieldId: keyof RealEstateValues,
+    checked: boolean
+  ) => {
+    if (typeof checked === 'boolean') {
+      setRealEstateValue(fieldId, checked)
+    }
+  }
+
+  const breakdown = getRealEstateBreakdown()
+
+  return (
+    <div className="space-y-6">
+      <Tabs
+        tabs={[
+          {
+            id: 'rental',
+            label: 'Rental',
+            content: (
+              <RentalPropertyTab
+                values={realEstateValues}
+                errors={realEstateErrors as Record<string, string | undefined>}
+                onValueChange={handleValueChange}
+                currency={currency}
+              />
+            )
+          },
+          {
+            id: 'primary',
+            label: 'Primary',
+            content: (
+              <PrimaryResidenceTab
+                values={realEstateValues}
+                errors={realEstateErrors as Record<string, string | undefined>}
+                onValueChange={handleValueChange}
+                currency={currency}
+              />
+            )
+          },
+          {
+            id: 'sale',
+            label: 'For Sale',
+            content: (
+              <PropertyForSaleTab
+                values={realEstateValues}
+                errors={realEstateErrors as Record<string, string | undefined>}
+                onValueChange={handleValueChange}
+                onToggleChange={handleToggleChange}
+                currency={currency}
+              />
+            )
+          },
+          {
+            id: 'vacant',
+            label: 'Vacant',
+            content: (
+              <VacantLandTab
+                currency={currency}
+                values={realEstateValues}
+                errors={realEstateErrors as Record<string, string | undefined>}
+                onValueChange={handleValueChange}
+                onToggleChange={handleToggleChange}
+              />
+            )
+          }
+        ]}
+        defaultTab="rental"
+      />
+
+      {/* Navigation */}
+      <CalculatorNav
+        currentCalculator="real-estate"
+        onCalculatorChange={onCalculatorChange}
+        onOpenSummary={onOpenSummary}
+      />
+    </div>
+  )
+} 
